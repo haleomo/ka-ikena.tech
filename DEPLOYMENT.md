@@ -55,6 +55,16 @@ The API includes CORS headers for `POST` and `OPTIONS`. If you change domains, e
     dart compile exe build/bin/server.dart -o frog_server
     sudo chmod +x /var/www/ka-ikena.tech/app/frog_server
 
+
+rob@skills-ez-server:/var/www/ka-ikena.tech $ ls -al
+total 24
+drwxr-xr-x 6 root     root     4096 Feb  8 09:59 .
+drwxr-xr-x 5 root     root     4096 Feb  4 17:05 ..
+drwxr-xr-x 5 root     root     4096 Feb  8 10:19 app
+drwxr-xr-x 4 www-data www-data 4096 Feb  8 11:05 html
+drwxr-xr-x 9 rob      www-data 4096 Feb  5 13:57 profile
+drwxr-xr-x 2 www-data www-data 4096 Feb  4 20:34 tools
+
 ## Setting up the frog server as a service
 
 ### Configuration File
@@ -71,10 +81,10 @@ User=www-data
 Group=www-data
 
 # Set the working directory
-WorkingDirectory=/var/www/skills-ez.me/app
+WorkingDirectory=/var/www/ka-ikena.tech/app
 
 # Path to your compiled executable
-ExecStart=/var/www/skills-ez.me/app/server
+ExecStart=/var/www/ka-ikena.tech/app/server
 
 # Automatically restart on crash
 Restart=always
@@ -107,14 +117,96 @@ curl -X POST http://ka-ikena.tech:8088/api/contact \
   -H "Content-Type: application/json" \
   -d '{"name":"Jane Doe","email":"jane@example.com","message":"Hello from curl!"}'
 
+# NGINX Setup
 
-## Proxy Forwarding to the API
-  # API (Dart Frog on localhost:8088)
-    location /api/ {
-        proxy_pass http://127.0.0.1:8088/;
-        proxy_http_version 1.1;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
+## Configuration File
+
+
+### /etc/nginx/sites-available/ka-ikena.tech
+
+        server {
+            server_name ka-ikena.tech www.ka-ikena.tech;
+
+            root /var/www/ka-ikena.tech/html;
+            index index.html;
+
+            location / {
+                try_files $uri $uri/ =404;
+            }
+
+            # proxy settings for API calls
+            location /api/ {
+                proxy_pass http://127.0.0.1:8088/;
+                proxy_http_version 1.1;
+                proxy_set_header Host $host;
+                proxy_set_header X-Real-IP $remote_addr;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                proxy_set_header X-Forwarded-Proto $scheme;
+            }
+
+            # Optional: cache static assets
+            location ~* \.(css|js|png|jpg|jpeg|gif|svg|ico|webp|woff2?)$ {
+                expires 30d;
+                add_header Cache-Control "public";
+                try_files $uri =404;
+            }
+
+            listen 443 ssl; # managed by Certbot
+            ssl_certificate /etc/letsencrypt/live/ka-ikena.tech/fullchain.pem; # managed by Certbot
+            ssl_certificate_key /etc/letsencrypt/live/ka-ikena.tech/privkey.pem; # managed by Certbot
+            include /etc/letsencrypt/options-ssl-nginx.conf; # managed by Certbot
+            ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem; # managed by Certbot
+
+
+        }
+
+        server {
+            if ($host = www.ka-ikena.tech) {
+                return 301 https://$host$request_uri;
+            } # managed by Certbot
+
+
+            if ($host = ka-ikena.tech) {
+                return 301 https://$host$request_uri;
+            } # managed by Certbot
+
+
+            listen 80;
+            server_name ka-ikena.tech www.ka-ikena.tech;
+            return 404; # managed by Certbot
+        }
+### /etc/nginx/sites-available/profile.ka-ikena.tech
+
+        server {
+            server_name profile.ka-ikena.tech;
+
+            root /var/www/ka-ikena.tech/profile;
+            index index.html;
+
+            location / {
+                try_files $uri $uri/ =404;
+            }
+
+            # Optional: cache static assets
+            location ~* \.(css|js|png|jpg|jpeg|gif|svg|ico|webp|woff2?)$ {
+                expires 30d;
+                add_header Cache-Control "public";
+                try_files $uri =404;
+            }
+
+            listen 443 ssl; # managed by Certbot
+            ssl_certificate /etc/letsencrypt/live/ka-ikena.tech/fullchain.pem; # managed by Certbot
+            ssl_certificate_key /etc/letsencrypt/live/ka-ikena.tech/privkey.pem; # managed by Certbot
+            include /etc/letsencrypt/options-ssl-nginx.conf; # managed by Certbot
+            ssl_dhparam /etc/letsencrypt/ssl-dhparams.pem; # managed by Certbot
+        }
+
+        server {
+            if ($host = profile.ka-ikena.tech) {
+                return 301 https://$host$request_uri;
+            } # managed by Certbot
+
+            listen 80;
+            server_name profile.ka-ikena.tech;
+            return 404; # managed by Certbot
+        }
